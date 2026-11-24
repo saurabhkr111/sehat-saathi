@@ -1,0 +1,738 @@
+"use client";
+
+import { useState } from "react";
+import {
+  LayoutDashboard,
+  Pill,
+  Volume2,
+  HeartPulse,
+  Trash2,
+  RefreshCw,
+  Plus,
+} from "lucide-react";
+
+const API = "http://127.0.0.1:8000";
+
+type Medicine = {
+  id?: string | number;
+  medicine_id?: string | number;
+  name?: string;
+  medicine_name?: string;
+  dosage?: string;
+  frequency?: string;
+  notes?: string;
+  instructions?: string;
+};
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [language, setLanguage] = useState("en");
+
+  // Medicine states
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [medicineName, setMedicineName] = useState("");
+  const [dosage, setDosage] = useState("");
+  const [frequency, setFrequency] = useState("");
+  const [medicineNotes, setMedicineNotes] = useState("");
+  const [medicineLoading, setMedicineLoading] = useState(false);
+  const [medicineError, setMedicineError] = useState("");
+
+  // Voice states
+  const [voiceText, setVoiceText] = useState("");
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voicePlaying, setVoicePlaying] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+
+  // General states
+  const [notification, setNotification] = useState("");
+
+  // ----------------------------------
+  // MEDICINE MANAGEMENT
+  // ----------------------------------
+
+  const fetchMedicines = async () => {
+    setMedicineLoading(true);
+    setMedicineError("");
+
+    try {
+      const response = await fetch(`${API}/api/v1/medicines`);
+
+      if (!response.ok) {
+        throw new Error("Unable to fetch medicines");
+      }
+
+      const data = await response.json();
+
+      setMedicines(Array.isArray(data) ? data : data.medicines || []);
+    } catch (error) {
+      console.error(error);
+      setMedicineError("Unable to load medicines. Check your backend.");
+    } finally {
+      setMedicineLoading(false);
+    }
+  };
+
+  const addMedicine = async () => {
+    if (!medicineName.trim()) {
+      setMedicineError("Medicine name is required.");
+      return;
+    }
+
+    setMedicineLoading(true);
+    setMedicineError("");
+
+    try {
+      const response = await fetch(`${API}/api/v1/medicines`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: medicineName.trim(),
+          dosage: dosage.trim(),
+          frequency: frequency.trim(),
+          instructions: medicineNotes.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+
+        throw new Error(
+          errorData?.detail || "Unable to add medicine"
+        );
+      }
+
+      setMedicineName("");
+      setDosage("");
+      setFrequency("");
+      setMedicineNotes("");
+
+      await fetchMedicines();
+
+      showNotification("Medicine added successfully.");
+    } catch (error: any) {
+      console.error(error);
+      setMedicineError(error.message || "Unable to add medicine.");
+    } finally {
+      setMedicineLoading(false);
+    }
+  };
+
+  const deleteMedicine = async (medicine: Medicine) => {
+    const medicineId = medicine.id ?? medicine.medicine_id;
+
+    if (medicineId === undefined) {
+      setMedicineError("Medicine ID is missing.");
+      return;
+    }
+
+    if (!confirm("Delete this medicine?")) return;
+
+    try {
+      const response = await fetch(
+        `${API}/api/v1/medicines/${medicineId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to delete medicine");
+      }
+
+      await fetchMedicines();
+
+      showNotification("Medicine deleted.");
+    } catch (error) {
+      console.error(error);
+      setMedicineError("Unable to delete medicine.");
+    }
+  };
+
+  // ----------------------------------
+  // ELEVENLABS VOICE
+  // ----------------------------------
+
+  const generateVoice = async () => {
+    if (!voiceText.trim()) {
+      setVoiceError("Please enter some text.");
+      return;
+    }
+
+    setVoiceLoading(true);
+    setVoicePlaying(false);
+    setVoiceError("");
+
+    try {
+      const response = await fetch(
+        `${API}/api/v1/voice/speak`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: voiceText,
+            language,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Voice generation failed.");
+      }
+
+      const blob = await response.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        setVoicePlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        setVoicePlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      setVoicePlaying(true);
+
+      await audio.play();
+    } catch (error) {
+      console.error(error);
+      setVoiceError("Unable to generate voice.");
+      setVoicePlaying(false);
+    } finally {
+      setVoiceLoading(false);
+    }
+  };
+
+  // ----------------------------------
+  // NOTIFICATIONS
+  // ----------------------------------
+
+  const showNotification = (message: string) => {
+    setNotification(message);
+
+    setTimeout(() => {
+      setNotification("");
+    }, 3000);
+  };
+
+  // ----------------------------------
+  // NAVIGATION
+  // ----------------------------------
+
+  const navigation = [
+    {
+      id: "dashboard",
+      icon: LayoutDashboard,
+      label: "Dashboard",
+    },
+    {
+      id: "medicines",
+      icon: Pill,
+      label: "Medicines",
+    },
+    {
+      id: "voice",
+      icon: Volume2,
+      label: "Voice Support",
+    },
+  ];
+
+  const navigate = (tab: string) => {
+    setActiveTab(tab);
+
+    if (tab === "medicines") {
+      fetchMedicines();
+    }
+  };
+
+  // ----------------------------------
+  // UI
+  // ----------------------------------
+
+  return (
+    <main className="flex min-h-screen bg-[#F7F1E8] text-[#2C2C2A]">
+
+      {/* SIDEBAR */}
+
+      <aside className="hidden min-h-screen w-64 flex-col bg-[#2D5A3D] p-6 text-white md:flex">
+
+        <div className="mb-10">
+          <div className="flex items-center gap-3">
+            <HeartPulse size={30} />
+
+            <h1 className="text-2xl font-bold">
+              Sehat Saathi
+            </h1>
+          </div>
+
+          <p className="mt-2 text-sm text-green-100">
+            Your personal medicine companion
+          </p>
+        </div>
+
+        <nav className="space-y-2">
+
+          {navigation.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
+                  activeTab === item.id
+                    ? "bg-white font-semibold text-[#2D5A3D]"
+                    : "hover:bg-white/10"
+                }`}
+              >
+                <Icon size={20} />
+
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+
+        </nav>
+
+        <div className="mt-auto pt-8">
+
+          <div className="rounded-2xl bg-white/10 p-4">
+
+            <p className="font-semibold">
+              Health Disclaimer
+            </p>
+
+            <p className="mt-2 text-xs text-green-100">
+              Sehat Saathi helps organize medicine
+              information and reminders. It does not
+              replace professional medical advice.
+            </p>
+
+          </div>
+
+        </div>
+
+      </aside>
+
+      {/* MAIN CONTENT */}
+
+      <section className="mx-auto w-full max-w-7xl flex-1 p-5 md:p-10">
+
+        {/* MOBILE NAV */}
+
+        <div className="mb-6 md:hidden">
+
+          <h1 className="text-2xl font-bold text-[#2D5A3D]">
+            Sehat Saathi
+          </h1>
+
+          <div className="mt-4 flex gap-2 overflow-x-auto">
+
+            {navigation.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`whitespace-nowrap rounded-xl px-4 py-2 ${
+                  activeTab === item.id
+                    ? "bg-[#2D5A3D] text-white"
+                    : "bg-white"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+
+          </div>
+
+        </div>
+
+        {/* HEADER */}
+
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+          <div>
+
+            <p className="text-sm text-gray-500">
+              VOICE-FIRST MEDICINE ASSISTANT
+            </p>
+
+            <h2 className="mt-1 text-3xl font-bold text-[#2D5A3D]">
+              {activeTab === "dashboard" && "Your Dashboard"}
+              {activeTab === "medicines" && "Medicine Manager"}
+              {activeTab === "voice" && "Voice Support"}
+            </h2>
+
+          </div>
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="rounded-xl border bg-white px-4 py-3"
+          >
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+          </select>
+
+        </header>
+
+        {/* NOTIFICATION */}
+
+        {notification && (
+          <div className="mb-6 rounded-xl bg-green-100 p-4 text-green-800">
+            {notification}
+          </div>
+        )}
+
+        {/* DASHBOARD */}
+
+        {activeTab === "dashboard" && (
+
+          <div className="space-y-8">
+
+            {/* HERO */}
+
+            <div className="rounded-3xl bg-[#2D5A3D] p-8 text-white md:p-10">
+
+              <p className="text-green-100">
+                Welcome to Sehat Saathi
+              </p>
+
+              <h3 className="mt-3 text-3xl font-bold md:text-4xl">
+                Never lose track
+                <br />
+                of your medicines.
+              </h3>
+
+              <p className="mt-4 max-w-xl text-green-100">
+                Organize your medicines, manage your
+                medication information and interact
+                with your assistant using voice.
+              </p>
+
+              <button
+                onClick={() => navigate("medicines")}
+                className="mt-6 rounded-xl bg-[#D4A017] px-6 py-3 font-semibold text-[#2C2C2A]"
+              >
+                Manage Medicines →
+              </button>
+
+            </div>
+
+            {/* FEATURE CARDS */}
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
+              <button
+                onClick={() => navigate("medicines")}
+                className="rounded-3xl bg-white p-6 text-left shadow-sm transition hover:shadow-md"
+              >
+
+                <Pill size={36} className="text-[#2D5A3D]" />
+
+                <h3 className="mt-4 text-xl font-bold">
+                  Medicine Manager
+                </h3>
+
+                <p className="mt-2 text-gray-500">
+                  Add, organize and manage your medicines.
+                </p>
+
+                <p className="mt-4 font-semibold text-[#2D5A3D]">
+                  Open Medicine Manager →
+                </p>
+
+              </button>
+
+              <button
+                onClick={() => navigate("voice")}
+                className="rounded-3xl bg-white p-6 text-left shadow-sm transition hover:shadow-md"
+              >
+
+                <Volume2 size={36} className="text-[#2D5A3D]" />
+
+                <h3 className="mt-4 text-xl font-bold">
+                  Voice Support
+                </h3>
+
+                <p className="mt-2 text-gray-500">
+                  Listen to spoken responses in English or Hindi.
+                </p>
+
+                <p className="mt-4 font-semibold text-[#2D5A3D]">
+                  Try Voice Support →
+                </p>
+
+              </button>
+
+            </div>
+
+            {/* DISCLAIMER */}
+
+            <div className="rounded-2xl border border-[#A8B5A2] bg-[#A8B5A2]/30 p-5">
+
+              <h3 className="font-semibold">
+                Important
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-700">
+                This application assists with medicine
+                organization and medication-related
+                information. Always follow your
+                healthcare professional's instructions.
+              </p>
+
+            </div>
+
+          </div>
+
+        )}
+
+        {/* MEDICINES */}
+
+        {activeTab === "medicines" && (
+
+          <div className="space-y-8">
+
+            {/* ADD MEDICINE */}
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
+
+              <h3 className="text-xl font-bold text-[#2D5A3D]">
+                Add Medicine
+              </h3>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                <input
+                  value={medicineName}
+                  onChange={(e) => setMedicineName(e.target.value)}
+                  placeholder="Medicine name *"
+                  className="rounded-xl border p-3"
+                />
+
+                <input
+                  value={dosage}
+                  onChange={(e) => setDosage(e.target.value)}
+                  placeholder="Dosage (e.g. 500 mg)"
+                  className="rounded-xl border p-3"
+                />
+
+                <input
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value)}
+                  placeholder="Frequency (as prescribed)"
+                  className="rounded-xl border p-3"
+                />
+
+                <input
+                  value={medicineNotes}
+                  onChange={(e) => setMedicineNotes(e.target.value)}
+                  placeholder="Additional instructions"
+                  className="rounded-xl border p-3"
+                />
+
+              </div>
+
+              <button
+                onClick={addMedicine}
+                disabled={medicineLoading}
+                className="mt-5 flex items-center gap-2 rounded-xl bg-[#2D5A3D] px-6 py-3 text-white disabled:opacity-50"
+              >
+                <Plus size={18} />
+
+                {medicineLoading
+                  ? "Processing..."
+                  : "Add Medicine"}
+              </button>
+
+              {medicineError && (
+                <p className="mt-4 text-sm text-red-600">
+                  {medicineError}
+                </p>
+              )}
+
+            </div>
+
+            {/* MEDICINE LIST */}
+
+            <div className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
+
+              <div className="flex items-center justify-between gap-3">
+
+                <h3 className="text-xl font-bold text-[#2D5A3D]">
+                  Your Medicines
+                </h3>
+
+                <button
+                  onClick={fetchMedicines}
+                  className="flex items-center gap-2 rounded-xl border px-4 py-2"
+                >
+                  <RefreshCw size={16} />
+                  Refresh
+                </button>
+
+              </div>
+
+              {medicineLoading && (
+                <p className="mt-6 text-gray-500">
+                  Loading medicines...
+                </p>
+              )}
+
+              {!medicineLoading && medicines.length === 0 && (
+
+                <div className="mt-6 rounded-2xl bg-[#F7F1E8] p-8 text-center">
+
+                  <Pill size={36} className="mx-auto text-[#2D5A3D]" />
+
+                  <p className="mt-3 font-semibold">
+                    No medicines found
+                  </p>
+
+                  <p className="mt-2 text-sm text-gray-500">
+                    Add a medicine to get started.
+                  </p>
+
+                </div>
+
+              )}
+
+              <div className="mt-6 space-y-4">
+
+                {medicines.map((medicine, index) => (
+
+                  <div
+                    key={
+                      medicine.id ??
+                      medicine.medicine_id ??
+                      index
+                    }
+                    className="flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:justify-between"
+                  >
+
+                    <div>
+
+                      <h4 className="text-lg font-bold">
+                        {medicine.name ??
+                          medicine.medicine_name ??
+                          "Unnamed Medicine"}
+                      </h4>
+
+                      {medicine.dosage && (
+                        <p className="mt-1 text-gray-600">
+                          Dosage: {medicine.dosage}
+                        </p>
+                      )}
+
+                      {medicine.frequency && (
+                        <p className="mt-1 text-gray-600">
+                          Frequency: {medicine.frequency}
+                        </p>
+                      )}
+
+                      {(medicine.instructions || medicine.notes) && (
+                        <p className="mt-2 text-sm text-gray-500">
+                          {medicine.instructions ?? medicine.notes}
+                        </p>
+                      )}
+
+                    </div>
+
+                    <button
+                      onClick={() => deleteMedicine(medicine)}
+                      className="flex items-center gap-2 self-start rounded-xl border border-red-200 px-4 py-2 text-red-600"
+                    >
+                      <Trash2 size={16} />
+                      Delete
+                    </button>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        )}
+
+        {/* VOICE SUPPORT */}
+
+        {activeTab === "voice" && (
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
+
+            <h3 className="text-xl font-bold text-[#2D5A3D]">
+              Voice Support
+            </h3>
+
+            <p className="mt-2 text-gray-500">
+              Convert text into spoken audio using ElevenLabs.
+            </p>
+
+            <div className="mt-6">
+
+              <label className="font-medium">
+                Text
+              </label>
+
+              <textarea
+                value={voiceText}
+                onChange={(e) => setVoiceText(e.target.value)}
+                placeholder="Enter text to convert into speech..."
+                className="mt-2 min-h-40 w-full rounded-xl border p-4"
+              />
+
+            </div>
+
+            <button
+              onClick={generateVoice}
+              disabled={voiceLoading || !voiceText.trim()}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D5A3D] p-3 text-white disabled:opacity-50"
+            >
+              <Volume2 size={18} />
+
+              {voiceLoading
+                ? "Generating Audio..."
+                : voicePlaying
+                ? "Playing Audio..."
+                : "Generate & Play Voice"}
+            </button>
+
+            {voiceError && (
+              <p className="mt-4 text-red-600">
+                {voiceError}
+              </p>
+            )}
+
+          </div>
+
+        )}
+
+        {/* FOOTER */}
+
+        <footer className="mt-10 text-center text-sm text-gray-500">
+
+          <p>
+            Sehat Saathi · Your personal medicine companion
+          </p>
+
+          <p className="mt-2">
+            Not a substitute for professional medical advice.
+          </p>
+
+        </footer>
+
+      </section>
+
+    </main>
+  );
+}
