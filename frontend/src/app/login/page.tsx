@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "../../lib/supabase";
+import { isSupabaseConfigured, supabase } from "../../lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,6 +21,12 @@ export default function LoginPage() {
     setLoading(true);
     setMessage("");
     setSuccess(false);
+
+    if (!isSupabaseConfigured) {
+      setMessage("Supabase key not set.");
+      setLoading(false);
+      return;
+    }
 
     try {
       if (isLogin) {
@@ -73,6 +79,13 @@ export default function LoginPage() {
             Your health. Your language. Your conversation.
           </p>
         </div>
+
+        {!isSupabaseConfigured && (
+          <div className="mb-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            Supabase key not set. The login screen still works, but sign-in
+            needs public Supabase values.
+          </div>
+        )}
 
         <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
           <button

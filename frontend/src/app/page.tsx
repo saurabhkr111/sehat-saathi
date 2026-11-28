@@ -28,7 +28,7 @@ import ProfilePanel from "../components/ProfilePanel";
 import { markDoseAsTaken } from "../lib/doseLogs";
 import { useAuth } from "../context/AuthContext";
 
-const API = "http://127.0.0.1:8000";
+const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type Medicine = {
   id: string;
@@ -231,7 +231,10 @@ function HomeContent() {
       });
 
       if (!response.ok) {
-        throw new Error(`Voice API returned status ${response.status}`);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.detail || "Voice key not set.",
+        );
       }
 
       const contentType = response.headers.get("content-type");
@@ -457,7 +460,8 @@ if (result.intent === "CREATE_REMINDER") {
       );
 
       if (!ttsResponse.ok) {
-        throw new Error("Unable to generate assistant voice.");
+        const errorData = await ttsResponse.json().catch(() => null);
+        throw new Error(errorData?.detail || "Voice key not set.");
       }
 
       const audioBlob = await ttsResponse.blob();

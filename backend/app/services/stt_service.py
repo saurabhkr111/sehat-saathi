@@ -8,14 +8,13 @@ class STTService:
     def __init__(self):
         self.api_key = settings.SARVAM_API_KEY
 
-        if not self.api_key:
-            raise RuntimeError("Sarvam API key is not configured.")
-
     async def transcribe_audio(
         self,
         audio_file,
         language_code: str = "en-IN",
     ) -> dict:
+        if not self.api_key:
+            raise RuntimeError("Voice key not set.")
 
         headers = {
             "api-subscription-key": self.api_key,

@@ -3,11 +3,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.services.assistant_service import assistant_service
-from app.services.assistant_service import assistant_service
 from app.settings import settings
 from app.schemas.tts_schema import TTSRequest
 from app.services.tts_service import tts_service
 from app.services.stt_service import stt_service
+
+
+def raise_voice_error(error: Exception) -> None:
+    message = str(error)
+
+    if "key not set" in message.lower():
+        raise HTTPException(
+            status_code=503,
+            detail="Voice key not set.",
+        )
+
+    raise HTTPException(
+        status_code=500,
+        detail=message or "Voice request failed.",
+    )
 
 
 # =========================================================
@@ -26,7 +40,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    allow_origins=[
+        settings.frontend_origin,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,13 +94,12 @@ def speak_text(request: TTSRequest):
             },
         )
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         print(f"TTS Error: {e}")
-
-        raise HTTPException(
-            status_code=500,
-            detail="Voice generation failed.",
-        )
+        raise_voice_error(e)
 
 
 # =========================================================
@@ -172,13 +189,8 @@ async def transcribe_audio(
         raise
 
     except Exception as e:
-
         print(f"STT Error: {e}")
-
-        raise HTTPException(
-            status_code=500,
-            detail="Speech transcription failed.",
-        )
+        raise_voice_error(e)
 
     finally:
         await file.close()
