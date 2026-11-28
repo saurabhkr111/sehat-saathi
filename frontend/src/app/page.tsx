@@ -31,7 +31,7 @@ import { useAuth } from "../context/AuthContext";
 function getApiBase() {
   const fromEnv = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "")
     .trim()
-    .replace(/\/$/, "");
+    .replace(/\\/$/, "");
   const host =
     typeof window !== "undefined" ? window.location.hostname : "";
   const onLocalhost = host === "localhost" || host === "127.0.0.1";
@@ -39,13 +39,13 @@ function getApiBase() {
     fromEnv.includes("localhost") || fromEnv.includes("127.0.0.1");
 
   if (host && !onLocalhost && envIsLocal) {
-    return "https://sehat-saathi-5o7w.onrender.com";
+    return "https://sehat-saathi-1-9fvf.onrender.com";
   }
 
   if (fromEnv) return fromEnv;
   if (onLocalhost) return "http://localhost:8000";
 
-  return "https://sehat-saathi-5o7w.onrender.com";
+  return "https://sehat-saathi-1-9fvf.onrender.com";
 }
 
 const API = getApiBase();

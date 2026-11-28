@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Sehat Saathi API"
+
     frontend_origin: str = "http://localhost:3000"
     frontend_origins: str = (
         "http://localhost:3000,"
