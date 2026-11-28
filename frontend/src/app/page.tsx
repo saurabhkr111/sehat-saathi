@@ -28,7 +28,27 @@ import ProfilePanel from "../components/ProfilePanel";
 import { markDoseAsTaken } from "../lib/doseLogs";
 import { useAuth } from "../context/AuthContext";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+function getApiBase() {
+  const fromEnv = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "")
+    .trim()
+    .replace(/\/$/, "");
+  const host =
+    typeof window !== "undefined" ? window.location.hostname : "";
+  const onLocalhost = host === "localhost" || host === "127.0.0.1";
+  const envIsLocal =
+    fromEnv.includes("localhost") || fromEnv.includes("127.0.0.1");
+
+  if (host && !onLocalhost && envIsLocal) {
+    return "https://sehat-saathi-5o7w.onrender.com";
+  }
+
+  if (fromEnv) return fromEnv;
+  if (onLocalhost) return "http://localhost:8000";
+
+  return "https://sehat-saathi-5o7w.onrender.com";
+}
+
+const API = getApiBase();
 
 type Medicine = {
   id: string;

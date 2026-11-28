@@ -38,13 +38,22 @@ app = FastAPI(
 # CORS Configuration
 # =========================================================
 
+def get_cors_origins() -> list[str]:
+    origins = {
+        settings.frontend_origin,
+        *[
+            origin.strip()
+            for origin in settings.frontend_origins.split(",")
+            if origin.strip()
+        ],
+    }
+    return list(origins)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.frontend_origin,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=get_cors_origins(),
+    allow_origin_regex=r"https://sehat-saathi.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
