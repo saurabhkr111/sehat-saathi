@@ -36,25 +36,14 @@ app = FastAPI(
 
 # =========================================================
 # CORS Configuration
+# Voice routes do not use cookies, so a wildcard origin is safe
+# and avoids missing Access-Control-Allow-Origin on Vercel.
 # =========================================================
-
-def get_cors_origins() -> list[str]:
-    origins = {
-        settings.frontend_origin,
-        *[
-            origin.strip()
-            for origin in settings.frontend_origins.split(",")
-            if origin.strip()
-        ],
-    }
-    return list(origins)
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_cors_origins(),
-    allow_origin_regex=r"https://sehat-saathi.*\.vercel\.app",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
