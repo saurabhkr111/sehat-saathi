@@ -1,5 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import Response
 
 from app.services.assistant_service import assistant_service
@@ -34,19 +33,32 @@ app = FastAPI(
 )
 
 
-# =========================================================
-# CORS Configuration
-# Voice routes do not use cookies, so a wildcard origin is safe
-# and avoids missing Access-Control-Allow-Origin on Vercel.
-# =========================================================
+def cors_headers(request: Request) -> dict[str, str]:
+    origin = request.headers.get("origin") or "*"
+    requested_headers = request.headers.get(
+        "access-control-request-headers",
+        "Content-Type, Authorization",
+    )
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
+        "Access-Control-Allow-Headers": requested_headers,
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin",
+    }
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+@app.middleware("http")
+async def open_cors(request: Request, call_next):
+    headers = cors_headers(request)
+
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=headers)
+
+    response = await call_next(request)
+    for key, value in headers.items():
+        response.headers[key] = value
+    return response
 
 
 # =========================================================
@@ -59,6 +71,7 @@ def root():
         "name": settings.app_name,
         "status": "running",
         "docs": "/docs",
+        "cors": "open-v2",
     }
 
 
@@ -66,7 +79,13 @@ def root():
 def health():
     return {
         "status": "ok",
+        "cors": "open-v2",
     }
+
+
+@app.options("/{full_path:path}")
+def cors_preflight(full_path: str, request: Request):
+    return Response(status_code=204, headers=cors_headers(request))
 
 
 # =========================================================
@@ -202,34 +221,12 @@ async def process_command(
     text: str = Form(...),
     language: str = Form("en"),
 ):
-
     if not text.strip():
         raise HTTPException(
             status_code=400,
             detail="Command text cannot be empty.",
         )
 
-    try:
-        result = assistant_service.process_command(
-            text=text,
-            language=language,
-        )
-
-        return result
-
-    except Exception as e:
-        print(f"Assistant Error: {e}")
-
-        raise HTTPException(
-            status_code=500,
-            detail="Command processing failed.",
-        )
-
-@app.post("/api/v1/assistant/command")
-def process_command(
-    text: str = Form(...),
-    language: str = Form("en"),
-):
     try:
         result = assistant_service.process_command(
             text=text,
