@@ -29,9 +29,8 @@ import { markDoseAsTaken } from "../lib/doseLogs";
 import { useAuth } from "../context/AuthContext";
 
 function getApiBase() {
-  const fromEnv = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "")
-    .trim()
-    .replace(/\\/$/, "");
+  const raw = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim();
+  const fromEnv = raw.endsWith("/") ? raw.slice(0, -1) : raw;
   const host =
     typeof window !== "undefined" ? window.location.hostname : "";
   const onLocalhost = host === "localhost" || host === "127.0.0.1";
